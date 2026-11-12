@@ -1,0 +1,13 @@
+[project]
+name="c-ngramgs"
+version="0.0.1"
+authors=[
+{name="Micajah Bullard", email="micbul@unc.edu"}
+]
+readme="README.md"
+dependencies=[
+"nltk"
+"numpy"
+"matplotlib"
+"sqlite3"
+]

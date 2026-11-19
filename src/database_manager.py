@@ -2,6 +2,7 @@
 
 import sqlite3
 
+from typing import Any, Optional
 class DatabaseManager:
     """
     I wish I could just have a giant hash table stored on disk
@@ -10,44 +11,50 @@ class DatabaseManager:
     """
 
     fname: str
-    db: any
-    cursor: any
+    db: Any
     total_seen: int
 
-    def __init__(self, fname):
+    def __init__(self, fname: str = "grams.db"):
         self.fname = fname
-        self.db = sqlite3.connect("grams.db")
+        self.db = sqlite3.connect(fname)
         self.total_seen = 0
 
+    @staticmethod
+    def _table(n: int) -> str:
+        return f"grams_{int(n)}"
+
     def create_table(self, n: int):
-        table_name = f"{n}-grams"
         cur = self.db.cursor()
-        cur.execute(f"""CREATE TABLE IF NOT EXISTS {n}-grams(
-        gram DISTINCT VARCHAR(255),
-        n_occurrances INT,
-        probability FLOAT
+        cur.execute(f"""CREATE TABLE IF NOT EXISTS {self._table(n)}(
+        gram TEXT PRIMARY KEY,
+        n_occurrences INT
         )""")
+        self.db.commit()
 
-    def get_ngram(self, ngram: str, n: int) -> (list, bool):
+    def get_ngram(self, ngram: str, n: int) -> tuple[Optional[tuple], bool]:
+        """Returns (row, not_found). row is (n_occurrences, probability) or None."""
         cur = self.db.cursor()
-        res = cur.execute(f"SELECT n_occurrances, probability FROM {n}-grams WHERE gram = {ngram}")
-        return (res.fetchone(), res.fetchone() is None)
+        res = cur.execute(f"SELECT n_occurrences FROM {self._table(n)} WHERE gram = ?", (ngram,))
+        row = res.fetchone()
+        if row is None:
+            return (None, True)
+        occ = row[0]
+        prob = occ / self.total_seen if self.total_seen else 0.0
+        return ((occ, prob), False)
 
-    def save_ngram(self, ngram: str, n: int, occurrances=1.0) -> (list, bool):
-        t, e = self.get_ngram(ngram, n)
+    def save_ngram(self, ngram: str, n: int, occurrences: int = 1) -> tuple[list, bool]:
+        self.create_table(n)
+        row, not_found = self.get_ngram(ngram, n)
         cur = self.db.cursor()
-        self.total_seen += n
+        self.total_seen += occurrences
 
-        if e == False:
-            cur.execute(f"""INSERT INTO {n}-grams VALUES(
-            {ngram},
-            {occurrances},
-            {occurrances / self.total_seen}
-            )""")
-            cur.commit()
-            return ([occurrances, occurrances / self.total_seen], True)
+        if not_found:
+            cur.execute(f"INSERT INTO {self._table(n)} VALUES (?, ?)", (ngram, occurrences))
+            self.db.commit()
+            return ([occurrences, occurrences / self.total_seen], True)
 
-        occ, prob = t
-        cur.execute(f"""UPDATE {n}-grams SET n_occurrances={occ + n}, probability={ (occ + n) / self.total_seen}""")
-        cur.commit()
-        return ([occ + n, (occ + n) / self.total_seen], True)
+        occ, _ = row
+        new_occ = occ + occurrences
+        cur.execute(f"UPDATE {self._table(n)} SET n_occurrences = ? WHERE gram = ?", (new_occ, ngram))
+        self.db.commit()
+        return ([new_occ, new_occ / self.total_seen], True)

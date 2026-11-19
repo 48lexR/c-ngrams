@@ -8,3 +8,7 @@ data/
 *.egg-info/
 *.db
 __pycache__/
+<<<<<<< HEAD
+=======
+*.csv
+>>>>>>> 02c2d7d (Rebase)

@@ -8,6 +8,7 @@ readme="README.md"
 dependencies=[
 "nltk",
 "numpy",
+"pandas",
 "matplotlib",
 "pygments",
 ]
